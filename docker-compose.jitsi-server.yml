@@ -1,0 +1,133 @@
+# Standalone Jitsi Meet server with JWT auth
+# Usage: docker compose -f docker-compose.jitsi-server.yml up -d
+# Requires: docker network create saas_network (if not already exists)
+#
+# Required env vars (or set defaults below):
+#   JITSI_APP_ID        – must match jitsi-meet service config (default: saas-teacher)
+#   JITSI_APP_SECRET    – shared secret, min 32 chars (default: jitsi-local-dev-secret-change-in-prod)
+#   JVB_ADVERTISE_IPS   – your host machine IP visible to the browser (default: 127.0.0.1)
+#
+# FIRST-TIME SETUP: visit https://localhost:8443 once and accept the self-signed certificate.
+
+networks:
+  saas_network:
+    external: true
+    name: saas_network
+  meet.jitsi:
+    name: meet.jitsi
+
+volumes:
+  jitsi-web-config: {}
+  jitsi-prosody-config: {}
+  jitsi-prosody-plugins: {}
+  jitsi-jicofo-config: {}
+  jitsi-jvb-config: {}
+
+services:
+
+  # ── Web UI ──────────────────────────────────────────────────────────────────
+  jitsi-web:
+    image: jitsi/web:stable
+    container_name: jitsi-web
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+      - "8443:443"
+    environment:
+      ENABLE_AUTH: 1
+      AUTH_TYPE: jwt
+      JWT_APP_ID: ${JITSI_APP_ID:-saas-teacher}
+      JWT_APP_SECRET: ${JITSI_APP_SECRET:-jitsi-local-dev-secret-change-in-prod}
+      XMPP_DOMAIN: meet.jitsi
+      XMPP_SERVER: jitsi-prosody
+      XMPP_BOSH_URL_BASE: http://jitsi-prosody:5280
+      # JitsiMeetExternalAPI always uses https:// — must match the HTTPS port
+      PUBLIC_URL: https://localhost:8443
+      ENABLE_WELCOME_PAGE: 0
+      TZ: UTC
+    volumes:
+      - jitsi-web-config:/config:Z
+      - ./jitsi-config/patch-config.sh:/etc/cont-init.d/99-patch-config:ro
+    networks:
+      - meet.jitsi
+      - saas_network
+    depends_on:
+      - jitsi-prosody
+
+  # ── XMPP server ─────────────────────────────────────────────────────────────
+  jitsi-prosody:
+    image: jitsi/prosody:stable
+    container_name: jitsi-prosody
+    restart: unless-stopped
+    environment:
+      ENABLE_AUTH: 1
+      AUTH_TYPE: jwt
+      JWT_APP_ID: ${JITSI_APP_ID:-saas-teacher}
+      JWT_APP_SECRET: ${JITSI_APP_SECRET:-jitsi-local-dev-secret-change-in-prod}
+      JWT_ALLOW_EMPTY: 0
+      JWT_AUTH_TYPE: token
+      JWT_TOKEN_AUTH_MODULE: token_verification
+      XMPP_DOMAIN: meet.jitsi
+      XMPP_AUTH_DOMAIN: auth.meet.jitsi
+      XMPP_MUC_DOMAIN: muc.meet.jitsi
+      XMPP_INTERNAL_MUC_DOMAIN: internal-muc.meet.jitsi
+      XMPP_RECORDER_DOMAIN: recorder.meet.jitsi
+      JICOFO_COMPONENT_SECRET: ${JICOFO_COMPONENT_SECRET:-s3cr3tjitsi01}
+      JICOFO_AUTH_PASSWORD: ${JICOFO_AUTH_PASSWORD:-jicofop4ss01}
+      JVB_AUTH_PASSWORD: ${JVB_AUTH_PASSWORD:-jvbp4ssw0rd01}
+      JIBRI_XMPP_PASSWORD: ${JIBRI_XMPP_PASSWORD:-jibripassword}
+      TZ: UTC
+    volumes:
+      - jitsi-prosody-config:/config:Z
+      - jitsi-prosody-plugins:/prosody-plugins-custom:Z
+    networks:
+      - meet.jitsi
+
+  # ── Conference focus ─────────────────────────────────────────────────────────
+  jitsi-jicofo:
+    image: jitsi/jicofo:stable
+    container_name: jitsi-jicofo
+    restart: unless-stopped
+    environment:
+      ENABLE_AUTH: 1
+      AUTH_TYPE: jwt
+      JWT_APP_ID: ${JITSI_APP_ID:-saas-teacher}
+      XMPP_DOMAIN: meet.jitsi
+      XMPP_SERVER: jitsi-prosody
+      XMPP_AUTH_DOMAIN: auth.meet.jitsi
+      XMPP_INTERNAL_MUC_DOMAIN: internal-muc.meet.jitsi
+      JICOFO_COMPONENT_SECRET: ${JICOFO_COMPONENT_SECRET:-s3cr3tjitsi01}
+      JICOFO_AUTH_PASSWORD: ${JICOFO_AUTH_PASSWORD:-jicofop4ss01}
+      TZ: UTC
+    volumes:
+      - jitsi-jicofo-config:/config:Z
+    depends_on:
+      - jitsi-prosody
+    networks:
+      - meet.jitsi
+
+  # ── Video Bridge ─────────────────────────────────────────────────────────────
+  jitsi-jvb:
+    image: jitsi/jvb:stable
+    container_name: jitsi-jvb
+    restart: unless-stopped
+    ports:
+      - "10000:10000/udp"
+      - "4443:4443"
+    environment:
+      XMPP_SERVER: jitsi-prosody
+      XMPP_DOMAIN: meet.jitsi
+      XMPP_AUTH_DOMAIN: auth.meet.jitsi
+      XMPP_INTERNAL_MUC_DOMAIN: internal-muc.meet.jitsi
+      JVB_AUTH_PASSWORD: ${JVB_AUTH_PASSWORD:-jvbp4ssw0rd01}
+      # Set this to your host machine IP so the browser can reach the video bridge
+      JVB_ADVERTISE_IPS: ${JVB_ADVERTISE_IPS:-127.0.0.1}
+      JVB_TCP_HARVESTER_DISABLED: "true"
+      TZ: UTC
+    volumes:
+      - jitsi-jvb-config:/config:Z
+    depends_on:
+      - jitsi-prosody
+    networks:
+      - meet.jitsi
+      - saas_network
