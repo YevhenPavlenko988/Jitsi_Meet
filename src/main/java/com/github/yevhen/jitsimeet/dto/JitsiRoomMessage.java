@@ -1,9 +1,11 @@
 package com.github.yevhen.jitsimeet.dto;
 
 import java.util.List;
+import java.util.UUID;
 
-public record CreateRoomRequest(
+public record JitsiRoomMessage(
+        String roomName,
         String eventRef,
-        String displayName,
+        UUID joinerUserId,
         List<String> participantEmails
 ) {}

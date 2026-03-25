@@ -39,6 +39,10 @@ services:
       JITSI_APP_ID: ${JITSI_APP_ID:-saas-teacher}
       JITSI_APP_SECRET: ${JITSI_APP_SECRET:-jitsi-local-dev-secret-change-in-prod}
       JITSI_ROOM_PREFIX: saas-
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
       DB_HOST: jitsi-postgres
       DB_PORT: 5432
       DB_NAME: jitsi_db
