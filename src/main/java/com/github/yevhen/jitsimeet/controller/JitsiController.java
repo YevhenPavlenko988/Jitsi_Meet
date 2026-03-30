@@ -43,6 +43,15 @@ public class JitsiController {
         return ResponseEntity.ok(jitsiService.getRooms(caller));
     }
 
+    /** List rooms where current user is invited as participant. */
+    @GetMapping("/rooms/invited")
+    public ResponseEntity<List<RoomResponse>> getInvitedRooms(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader
+    ) {
+        CallerInfo caller = jwtHelper.extractCallerInfo(authHeader);
+        return ResponseEntity.ok(jitsiService.getInvitedRooms(caller));
+    }
+
     /** Get a Jitsi JWT token for a specific room. Moderator flag is set by role. */
     @GetMapping("/rooms/{roomName}/token")
     public ResponseEntity<TokenResponse> getToken(
@@ -62,6 +71,17 @@ public class JitsiController {
     ) {
         CallerInfo caller = jwtHelper.extractCallerInfo(authHeader);
         jitsiService.deleteRoom(roomName, caller);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Mark room inactive when host leaves the conference. */
+    @PostMapping("/rooms/{roomName}/deactivate")
+    public ResponseEntity<Void> deactivateRoom(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader,
+            @PathVariable String roomName
+    ) {
+        CallerInfo caller = jwtHelper.extractCallerInfo(authHeader);
+        jitsiService.deactivateRoom(roomName, caller);
         return ResponseEntity.noContent().build();
     }
 }

@@ -25,6 +25,15 @@ public class JitsiRoom {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "is_active", nullable = false)
+    private boolean active = false;
+
+    @Column(name = "active_host_id")
+    private UUID activeHostId;
+
+    @Column(name = "activated_at")
+    private Instant activatedAt;
+
     protected JitsiRoom() {}
 
     public JitsiRoom(String roomName, UUID createdBy, String eventRef) {
@@ -43,4 +52,18 @@ public class JitsiRoom {
     public UUID getCreatedBy() { return createdBy; }
     public String getEventRef() { return eventRef; }
     public Instant getCreatedAt() { return createdAt; }
+    public boolean isActive() { return active; }
+    public UUID getActiveHostId() { return activeHostId; }
+    public Instant getActivatedAt() { return activatedAt; }
+
+    public void activate(UUID hostId) {
+        this.active = true;
+        this.activeHostId = hostId;
+        this.activatedAt = Instant.now();
+    }
+
+    public void deactivate() {
+        this.active = false;
+        this.activeHostId = null;
+    }
 }

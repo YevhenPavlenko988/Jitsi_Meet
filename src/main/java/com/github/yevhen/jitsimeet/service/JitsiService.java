@@ -2,7 +2,6 @@ package com.github.yevhen.jitsimeet.service;
 
 import com.github.yevhen.common.exception.ServiceException;
 import com.github.yevhen.common.security.CallerInfo;
-import com.github.yevhen.common.security.JwtHelper;
 import com.github.yevhen.jitsimeet.config.JitsiProperties;
 import com.github.yevhen.jitsimeet.config.RabbitConfig;
 import com.github.yevhen.jitsimeet.dto.CreateRoomRequest;
@@ -26,6 +25,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,20 +39,17 @@ public class JitsiService {
     private static final Set<String> MODERATOR_ROLES = Set.of("ADMIN", "MANAGER", "TEACHER");
 
     private final JitsiProperties props;
-    private final JwtHelper jwtHelper;
     private final JitsiRoomRepository roomRepository;
     private final JitsiRoomParticipantRepository participantRepository;
     private final RabbitTemplate rabbitTemplate;
 
     public JitsiService(
             JitsiProperties props,
-            JwtHelper jwtHelper,
             JitsiRoomRepository roomRepository,
             JitsiRoomParticipantRepository participantRepository,
             RabbitTemplate rabbitTemplate
     ) {
         this.props = props;
-        this.jwtHelper = jwtHelper;
         this.roomRepository = roomRepository;
         this.participantRepository = participantRepository;
         this.rabbitTemplate = rabbitTemplate;
@@ -103,6 +100,18 @@ public class JitsiService {
                 .toList();
     }
 
+    public List<RoomResponse> getInvitedRooms(CallerInfo caller) {
+        Set<UUID> roomIds = new HashSet<>(participantRepository.findByIdParticipantEmailIgnoreCase(caller.email())
+                .stream()
+                .map(JitsiRoomParticipant::getRoomId)
+                .toList());
+        if (roomIds.isEmpty()) return List.of();
+        return roomRepository.findAllByIdInAndActiveTrue(roomIds).stream()
+                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+                .map(room -> RoomResponse.from(room, props.getServerProtocol(), props.getServerUrl()))
+                .toList();
+    }
+
     @Transactional
     public void deleteRoom(String roomName, CallerInfo caller) {
         JitsiRoom room = roomRepository.findByRoomName(roomName)
@@ -120,6 +129,12 @@ public class JitsiService {
     public TokenResponse getToken(String roomName, String displayName, CallerInfo caller) {
         JitsiRoom room = roomRepository.findByRoomName(roomName)
                 .orElseThrow(() -> new ServiceException("Room not found", HttpStatus.NOT_FOUND));
+
+        // A room is considered active only while its host (creator) is in the call.
+        if (room.getCreatedBy().equals(caller.id())) {
+            room.activate(caller.id());
+            roomRepository.save(room);
+        }
 
         boolean isModerator = MODERATOR_ROLES.contains(caller.role());
         String resolvedName = (displayName != null && !displayName.isBlank()) ? displayName : caller.email();
@@ -155,6 +170,19 @@ public class JitsiService {
                 props.isUseJwt(),
                 props.getScriptOrigin()
         );
+    }
+
+    @Transactional
+    public void deactivateRoom(String roomName, CallerInfo caller) {
+        JitsiRoom room = roomRepository.findByRoomName(roomName)
+                .orElseThrow(() -> new ServiceException("Room not found", HttpStatus.NOT_FOUND));
+
+        if (!room.getCreatedBy().equals(caller.id()) && !caller.role().equals("ADMIN")) {
+            throw new ServiceException("Access denied", HttpStatus.FORBIDDEN);
+        }
+
+        room.deactivate();
+        roomRepository.save(room);
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────

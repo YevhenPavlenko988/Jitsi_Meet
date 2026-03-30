@@ -10,7 +10,8 @@ public record RoomResponse(
         String roomName,
         String eventRef,
         String jitsiUrl,
-        Instant createdAt
+        Instant createdAt,
+        boolean active
 ) {
     public static RoomResponse from(JitsiRoom room, String protocol, String serverUrl) {
         return new RoomResponse(
@@ -18,7 +19,8 @@ public record RoomResponse(
                 room.getRoomName(),
                 room.getEventRef(),
                 protocol + "://" + serverUrl + "/" + room.getRoomName(),
-                room.getCreatedAt()
+                room.getCreatedAt(),
+                room.isActive()
         );
     }
 }

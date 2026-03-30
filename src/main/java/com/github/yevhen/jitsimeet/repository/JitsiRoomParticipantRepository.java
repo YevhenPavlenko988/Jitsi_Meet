@@ -12,4 +12,6 @@ public interface JitsiRoomParticipantRepository
         extends JpaRepository<JitsiRoomParticipant, JitsiRoomParticipant.JitsiRoomParticipantId> {
 
     List<JitsiRoomParticipant> findByIdRoomId(UUID roomId);
+
+    List<JitsiRoomParticipant> findByIdParticipantEmailIgnoreCase(String participantEmail);
 }
