@@ -1,0 +1,24 @@
+name: Deploy jitsi-meet service to production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy to Jitsi DigitalOcean droplet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.JITSI_HOST }}
+          username: root
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/jitsi/Jitsi_Meet
+            git fetch origin main && git reset --hard origin/main
+            docker compose build jitsi-meet
+            docker compose up -d --force-recreate jitsi-meet
+            echo "✅ jitsi-meet deployed at $(date)"

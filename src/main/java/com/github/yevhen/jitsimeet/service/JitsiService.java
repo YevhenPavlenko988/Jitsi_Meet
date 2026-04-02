@@ -14,6 +14,7 @@ import com.github.yevhen.jitsimeet.repository.JitsiRoomParticipantRepository;
 import com.github.yevhen.jitsimeet.repository.JitsiRoomRepository;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.MacAlgorithm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -196,6 +197,7 @@ public class JitsiService {
 
     private String generateJitsiToken(UUID userId, String email, String displayName,
                                       boolean isModerator, String roomName) {
+        MacAlgorithm alg = Jwts.SIG.HS256;
         SecretKey key = Keys.hmacShaKeyFor(
                 props.getAppSecret().getBytes(StandardCharsets.UTF_8));
 
@@ -222,7 +224,7 @@ public class JitsiService {
                 .issuedAt(new Date(nowMs))
                 .notBefore(new Date(nowMs - 10_000))
                 .expiration(new Date(expMs))
-                .signWith(key)
+                .signWith(key, alg)
                 .compact();
     }
 }
