@@ -1,0 +1,44 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: jitsi-meet
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5434}/${DB_NAME:jitsi_db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:local-dev-secret-key-change-in-production-32ch}
+
+  jitsi:
+    server-url: ${JITSI_SERVER_URL:meet.jit.si}
+    server-protocol: ${JITSI_SERVER_PROTOCOL:https}
+    xmpp-domain: ${JITSI_XMPP_DOMAIN:meet.jit.si}
+    use-jwt: ${JITSI_USE_JWT:false}
+    script-origin: ${JITSI_SCRIPT_ORIGIN:}
+    app-id: ${JITSI_APP_ID:saas-teacher}
+    app-secret: ${JITSI_APP_SECRET:jitsi-local-dev-secret-change-in-prod}
+    room-prefix: ${JITSI_ROOM_PREFIX:saas-}
+    token-expiry-seconds: 7200
