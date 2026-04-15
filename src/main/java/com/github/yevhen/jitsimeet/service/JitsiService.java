@@ -5,6 +5,7 @@ import com.github.yevhen.common.security.CallerInfo;
 import com.github.yevhen.jitsimeet.config.JitsiProperties;
 import com.github.yevhen.jitsimeet.config.RabbitConfig;
 import com.github.yevhen.jitsimeet.dto.CreateRoomRequest;
+import com.github.yevhen.jitsimeet.dto.InternalCreateRoomRequest;
 import com.github.yevhen.jitsimeet.dto.JitsiRoomMessage;
 import com.github.yevhen.jitsimeet.dto.RoomResponse;
 import com.github.yevhen.jitsimeet.dto.TokenResponse;
@@ -184,6 +185,45 @@ public class JitsiService {
 
         room.deactivate();
         roomRepository.save(room);
+    }
+
+    // ─── Internal (service-to-service, no JWT) ───────────────────────────────
+
+    @Transactional
+    public RoomResponse getOrCreateRoomInternal(InternalCreateRoomRequest request) {
+        UUID createdBy = UUID.fromString(request.createdByUserId());
+        JitsiRoom room;
+        if (request.eventRef() != null && !request.eventRef().isBlank()) {
+            room = roomRepository.findByEventRef(request.eventRef())
+                    .orElseGet(() -> {
+                        String roomName = props.getRoomPrefix()
+                                + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+                        return roomRepository.save(new JitsiRoom(roomName, createdBy, request.eventRef()));
+                    });
+        } else {
+            String roomName = props.getRoomPrefix()
+                    + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+            room = roomRepository.save(new JitsiRoom(roomName, createdBy, null));
+        }
+
+        if (request.participantEmails() != null && !request.participantEmails().isEmpty()) {
+            final UUID roomId = room.getId();
+            List<String> existing = participantRepository.findByIdRoomId(roomId).stream()
+                    .map(p -> p.getParticipantEmail().toLowerCase(Locale.ROOT))
+                    .toList();
+            List<JitsiRoomParticipant> toInsert = request.participantEmails().stream()
+                    .filter(e -> e != null && !e.isBlank())
+                    .map(e -> e.toLowerCase(Locale.ROOT))
+                    .distinct()
+                    .filter(e -> !existing.contains(e))
+                    .map(e -> new JitsiRoomParticipant(roomId, e))
+                    .toList();
+            if (!toInsert.isEmpty()) {
+                participantRepository.saveAll(toInsert);
+            }
+        }
+
+        return RoomResponse.from(room, props.getServerProtocol(), props.getServerUrl());
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
